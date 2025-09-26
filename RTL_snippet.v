@@ -1,3 +1,37 @@
+reg        pending_check;
+reg [1:0]  saved_tx_enc_cnt;
+reg [31:0] expected_val;
+
+always @(posedge clk) begin
+  if (!rstn) begin
+    pending_check     <= 1'b0;
+    saved_tx_enc_cnt  <= 2'd0;
+    expected_val      <= 32'h0;
+  end
+  else begin
+    // Perform the check from previous cycle
+    if (pending_check) begin
+      if (buf1[saved_tx_enc_cnt] !== expected_val) begin
+        $error("XOR mismatch at time %0t: buf1[%0d]=%h expected=%h",
+               $time, saved_tx_enc_cnt, buf1[saved_tx_enc_cnt], expected_val);
+      end
+      pending_check <= 1'b0; // clear after checking
+    end
+
+    // Capture for next cycle if ack & cnt != 0
+    if (blk_ks_ack && (tx_enc_cnt != 2'd0)) begin
+      saved_tx_enc_cnt <= tx_enc_cnt;
+      expected_val     <= buf1[tx_enc_cnt] ^ blk_ks_buf[blk_ks_idx];
+      pending_check    <= 1'b1;
+    end
+  end
+end
+
+
+
+
+
+
 at every posedge of clk --> check if blk_ks_ack is high, if yes then perform xor operation between buf1[tx_enc_cnt[0]] , blk_ks_buf[blk_ks_idx] and check the value buf1[tx_enc_cnt[0]] this value should be the one that is used for calculation on the next posedge of the clk.
     tx_enc_cnt[1:0], blk_ks_idx[1:0], when tx_enc_cnt = 0 do nothing. 
 
