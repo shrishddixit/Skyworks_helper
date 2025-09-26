@@ -1,3 +1,9 @@
+at every posedge of clk --> check if blk_ks_ack is high, if yes then perform xor operation between buf1[tx_enc_cnt[0]] , blk_ks_buf[blk_ks_idx] and check the value buf1[tx_enc_cnt[0]] this value should be the one that is used for calculation on the next posedge of the clk.
+    tx_enc_cnt[1:0], blk_ks_idx[1:0], when tx_enc_cnt = 0 do nothing. 
+
+
+
+
 I have aes_data_in as input, 
 aes_start is when aes_data_calculated will be avaialble. 
 when aes_done is seen aes_data_collected should beon the aes_data_out 
