@@ -1,3 +1,8 @@
+I have aes_data_in as input, 
+aes_start is when aes_data_calculated will be avaialble. 
+when aes_done is seen aes_data_collected should beon the aes_data_out 
+
+
 reg [0:3][31:0] blk_ks_buf;
 always @(posedge clk or negedge rstn)
     if(!rstn)
