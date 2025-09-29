@@ -134,7 +134,8 @@ wire [2:0] ks_nxt3    = ks_shifted[5:3];                         // next 3 MSBs 
 assign ecu_txbit_sig1_r_o = phy_tx_bits_i[2:0] ^ ks_hi3;
 assign ecu_txbit_sig2_r_o = phy_tx_bits_i[5:3] ^ ks_nxt3;
 
-
+phy_tx_bits_i [5:0]
+txbits_per_symbol_i [1:0]
 
 
 
