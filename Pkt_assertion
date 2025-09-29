@@ -139,6 +139,122 @@ txbits_per_symbol_i [1:0]
 
 
 
+*****************************************
+
+always @(posedge clk or negedge rstn)
+    if(!rstn)
+        enc_pkt <= 1'b0;
+    else if(pkt_start)
+        enc_pkt <= pkt_enc_en;
+
+assign pkt_enc = enc_pkt && pkt_key_rdy && 
+                    pkt_ks_buf_empty && !pkt_ks_buf_load;
+
+////////////////////////////////////////////////////////////////
+
+always @(posedge clk or negedge rstn)                                           
+    if(!rstn) begin                                                             
+        pkt_ctr <= '0;                                                          
+    end else if(pkt_start) begin                                                
+        pkt_ctr <= '0;                                                          
+    end else if(pkt_ks_buf_load) begin                                          
+        pkt_ctr <= pkt_ctr + 1'b1;                                              
+    end
+
+/*//////////////////////////////////////////////////////////////
+  128-bit keystream buffer
+
+  We need to buffer output as packet and stream encryption
+  share the same AES block. While the AES block will hold
+  its output data constant, we need to save it so the AES block
+  can be used for stream encryption.
+*/
+reg [0:3][31:0] pkt_ks_buf;
+reg [2:0]       pkt_ks_buf_size; // size in 32-bit words (0-4)
+wire            load_pkt_shift;
+
+always @(posedge clk or negedge rstn)
+    if(!rstn)
+        pkt_ks_buf_size <= 3'd0;
+    else if(pkt_start || pkt_done)
+        pkt_ks_buf_size <= 3'd0;
+    else if(pkt_ks_buf_load)
+        pkt_ks_buf_size <= 3'd4;
+    else if(load_pkt_shift)
+        pkt_ks_buf_size <= pkt_ks_buf_size - 1'b1;
+
+assign pkt_ks_buf_empty = !pkt_ks_buf_size;
+
+always @(posedge clk or negedge rstn)
+    if(!rstn)
+        pkt_ks_buf <= '0;
+    else if(pkt_ks_buf_load)
+        pkt_ks_buf <= aes_data_out;
+
+////////////////////////////////////////////////////////////////
+
+// We need a small buffer to use while the next keystream is being computed.
+// We can't use the same 128-bit output buffer as we need that to be empty
+// when computation is done to free up AES block for stream encryption,
+// otherwise we would have to stall the AES block and wait until the buffer 
+// is empty before we could start another stream encryption operation.
+
+// Since bits per symbol may be 1, 2, 3, 4, 6, we need to merge
+// data across buffers. 
+// Implement the small buffer as a shifter. 
+// This simplifies the merge operation.
+reg [0:31] pkt_ks_shifter;
+reg [5:0]  pkt_ks_shift_size;
+
+// load shifter when it is empty and buffer has data
+assign load_pkt_shift = pkt_ks_buf_size && !pkt_ks_shift_size;
+
+// load keystream when it is empty and shifter has data
+wire shift_pkt_ks = !pkt_ks_vld && pkt_ks_shift_size;
+
+always @(posedge clk or negedge rstn)
+    if(!rstn)
+        pkt_ks_shift_size <= 6'd0;
+    else if(pkt_start || pkt_done) 
+        pkt_ks_shift_size <= 6'd0;
+    else if(load_pkt_shift)
+        pkt_ks_shift_size <= 6'd32;
+    else if(shift_pkt_ks)
+        pkt_ks_shift_size <= pkt_ks_shift_size - 1'b1;
+
+wire [1:0] pkt_buf_sel = 3'd4-pkt_ks_buf_size;
+
+always @(posedge clk or negedge rstn)
+    if(!rstn)
+        pkt_ks_shifter <= '0;
+    else if(load_pkt_shift)
+        pkt_ks_shifter <= pkt_ks_buf[pkt_buf_sel];
+    else if(shift_pkt_ks)
+        pkt_ks_shifter <= pkt_ks_shifter << 1;
+
+////////////////////////////////////////////////////////////////
+// packet keystream output
+
+wire rd_ks;
+reg [2:0]  pkt_ks_size;
+always @(posedge clk or negedge rstn)
+    if(!rstn)
+        pkt_ks_size <= 5'd0;
+    else if(pkt_start || pkt_done || rd_ks) 
+        pkt_ks_size <= 5'd0;
+    else if(shift_pkt_ks)
+        pkt_ks_size <= pkt_ks_size + 1'b1;
+
+always @(posedge clk or negedge rstn)
+    if(!rstn)
+        pkt_keystream <= '0;
+    else if(pkt_start || pkt_done || rd_ks) 
+        pkt_keystream <= '0;
+    else if(shift_pkt_ks)
+        pkt_keystream <= pkt_keystream << 1 | pkt_ks_shifter[0];
+
+
+
 
 
 
