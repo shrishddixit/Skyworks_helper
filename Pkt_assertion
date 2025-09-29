@@ -253,6 +253,8 @@ always @(posedge clk or negedge rstn)
     else if(shift_pkt_ks)
         pkt_keystream <= pkt_keystream << 1 | pkt_ks_shifter[0];
 
+assign pkt_ks_vld = pkt_ks_size >= bits_per_symbol;
+
 
 
 *********************************************************************************************
