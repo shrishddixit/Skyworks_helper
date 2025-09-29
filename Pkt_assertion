@@ -317,6 +317,74 @@ always @(posedge clk or negedge rstn) begin
   end
 end
 
+////////////////////***************************&&&&&&&&&&&&&&&&&&&&&
+
+
+USe this 
+
+
+// ============================================================
+// Testbench mirror of DUT pkt_keystream generation
+// ============================================================
+
+reg [0:3][31:0] tb_pkt_ks_buf;        // 128-bit buffer split into 4x32
+reg [2:0]       tb_pkt_ks_buf_size;   // size in words (0-4)
+reg [0:31]      tb_pkt_ks_shifter;    // 32-bit shifter
+reg [5:0]       tb_pkt_ks_shift_size; // bits remaining in shifter
+reg [5:0]       tb_pkt_keystream;     // rolling 6-bit window
+reg [2:0]       tb_pkt_ks_size;       // #bits shifted into keystream
+
+wire            tb_load_pkt_shift;
+wire            tb_shift_pkt_ks;
+wire [1:0]      tb_pkt_buf_sel;
+wire            tb_pkt_ks_vld;
+
+// ----------------- Control logic (identical to RTL) -----------------
+assign tb_load_pkt_shift = tb_pkt_ks_buf_size && !tb_pkt_ks_shift_size;
+assign tb_shift_pkt_ks   = !tb_pkt_ks_vld && tb_pkt_ks_shift_size;
+assign tb_pkt_buf_sel    = 3'd4 - tb_pkt_ks_buf_size;
+assign tb_pkt_ks_vld     = tb_pkt_ks_size >= bits_per_symbol;
+
+// ----------------- Sequential mirror -----------------
+always @(posedge clk or negedge rstn) begin
+  if (!rstn) begin
+    tb_pkt_ks_buf        <= '0;
+    tb_pkt_ks_buf_size   <= 3'd0;
+    tb_pkt_ks_shifter    <= '0;
+    tb_pkt_ks_shift_size <= 6'd0;
+    tb_pkt_keystream     <= 6'd0;
+    tb_pkt_ks_size       <= 3'd0;
+  end else begin
+    // === AES output buffer ===
+    if (pkt_ks_buf_load) begin
+      tb_pkt_ks_buf      <= aes_data_out; // << only input from your model
+      tb_pkt_ks_buf_size <= 3'd4;
+    end else if (tb_load_pkt_shift) begin
+      tb_pkt_ks_buf_size <= tb_pkt_ks_buf_size - 1'b1;
+    end
+
+    // === 32-bit shifter ===
+    if (tb_load_pkt_shift) begin
+      tb_pkt_ks_shifter    <= tb_pkt_ks_buf[tb_pkt_buf_sel];
+      tb_pkt_ks_shift_size <= 6'd32;
+    end else if (tb_shift_pkt_ks) begin
+      tb_pkt_ks_shifter    <= tb_pkt_ks_shifter << 1;   // MSB-first
+      tb_pkt_ks_shift_size <= tb_pkt_ks_shift_size - 1'b1;
+    end
+
+    // === 6-bit rolling keystream ===
+    if (pkt_start || pkt_done || rd_ks) begin
+      tb_pkt_keystream <= 6'd0;
+      tb_pkt_ks_size   <= 3'd0;
+    end else if (tb_shift_pkt_ks) begin
+      tb_pkt_keystream <= (tb_pkt_keystream << 1) | tb_pkt_ks_shifter[0];
+      tb_pkt_ks_size   <= tb_pkt_ks_size + 1'b1;
+    end
+  end
+end
+
+
+
 
 
 
