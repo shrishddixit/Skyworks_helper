@@ -255,6 +255,69 @@ always @(posedge clk or negedge rstn)
 
 
 
+*********************************************************************************************
+Final soln 
+*********************************************************************************************
+
+// ====================================================================
+// Testbench logic to generate pkt_keystream from aes_data_out
+// ====================================================================
+
+// Inputs in TB
+reg         clk, rstn;
+reg  [127:0] aes_data_out;      // driven by your AES model
+reg          pkt_start, pkt_done, pkt_ks_buf_load, pkt_ks_vld, rd_ks;
+
+// Internal regs
+reg  [0:3][31:0] tb_pkt_ks_buf;
+reg  [2:0]       tb_pkt_ks_buf_size;
+reg  [0:31]      tb_pkt_ks_shifter;
+reg  [5:0]       tb_pkt_ks_shift_size;
+reg  [5:0]       pkt_keystream;   // <-- this is what you want
+
+// Controls
+wire       tb_load_pkt_shift = tb_pkt_ks_buf_size && !tb_pkt_ks_shift_size;
+wire       tb_shift_pkt_ks   = !pkt_ks_vld && tb_pkt_ks_shift_size;
+wire [1:0] tb_pkt_buf_sel    = 3'd4 - tb_pkt_ks_buf_size;
+
+// Sequential logic
+always @(posedge clk or negedge rstn) begin
+  if (!rstn) begin
+    tb_pkt_ks_buf       <= '0;
+    tb_pkt_ks_buf_size  <= 3'd0;
+    tb_pkt_ks_shifter   <= '0;
+    tb_pkt_ks_shift_size<= 6'd0;
+    pkt_keystream       <= 6'd0;
+  end else begin
+    // Capture new AES block into 128-bit buffer
+    if (pkt_ks_buf_load) begin
+      tb_pkt_ks_buf      <= aes_data_out;
+      tb_pkt_ks_buf_size <= 3'd4;
+    end else if (tb_load_pkt_shift) begin
+      tb_pkt_ks_buf_size <= tb_pkt_ks_buf_size - 1'b1;
+    end
+
+    // Shifter load/shift
+    if (tb_load_pkt_shift) begin
+      tb_pkt_ks_shifter    <= tb_pkt_ks_buf[tb_pkt_buf_sel];
+      tb_pkt_ks_shift_size <= 6'd32;
+    end else if (tb_shift_pkt_ks) begin
+      tb_pkt_ks_shifter    <= tb_pkt_ks_shifter << 1;       // MSB-first
+      tb_pkt_ks_shift_size <= tb_pkt_ks_shift_size - 1'b1;
+    end
+
+    // 6-bit rolling keystream window
+    if (pkt_start || pkt_done || rd_ks) begin
+      pkt_keystream <= 6'd0;
+    end else if (tb_shift_pkt_ks) begin
+      pkt_keystream <= (pkt_keystream << 1) | tb_pkt_ks_shifter[0];
+    end
+  end
+end
+
+
+
+
 
 
 
