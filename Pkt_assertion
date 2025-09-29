@@ -1,0 +1,31 @@
+ if(!rstn)
+        pkt_keystream <= '0;   
+
+   else if(shift_pkt_ks)
+        pkt_keystream <= pkt_keystream << 1 | pkt_ks_shifter[0];
+
+
+always @(posedge clk or negedge rstn)
+    if(!rstn)
+        pkt_ks_shifter <= '0;
+    else if(load_pkt_shift)
+        pkt_ks_shifter <= pkt_ks_buf[pkt_buf_sel];
+    else if(shift_pkt_ks)
+        pkt_ks_shifter <= pkt_ks_shifter << 1;
+
+
+reg [0:31] pkt_ks_shifter;
+   output reg [ 5:0] pkt_keystream
+   
+   // load keystream when it is empty and shifter has data
+wire shift_pkt_ks = !pkt_ks_vld && pkt_ks_shift_size;
+
+
+assign ecu_txbit_sig1_r_o = phy_tx_bits_i[2:0] ^ pkt_keystream_i[2:0];
+assign ecu_txbit_sig2_r_o = phy_tx_bits_i[5:3] ^
+                                pkt_keystream_i >> txbits_per_symbol_i;
+
+    input   [5:0]      phy_tx_bits_i,        // 
+    output  [2:0]      ecu_txbit_sig1_r_o,   // 
+    output  [2:0]      ecu_txbit_sig2_r_o,   // 
+    input   [1:0]      txbits_per_symbol_i,  // 
