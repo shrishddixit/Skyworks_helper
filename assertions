@@ -1,0 +1,11 @@
+AXI-Lite Write Channel Timing + Response
+
+Signals (ACLK, ARESETn):
+AW: AWVALID, AWREADY
+W: WVALID, WREADY
+B: BVALID, BREADY, BRESP[1:0]
+Rules:
+	1.	When both address & data are accepted (AWVALID&&AWREADY && WVALID&&WREADY in the same cycle or over time), a BVALID must appear within 1–8 ACLK cycles.
+	2.	BVALID must not assert before both AW and W handshakes are completed.
+	3.	While BVALID==1, BRESP must be stable until handshake (BREADY).
+	4.	Cover: min-latency response (1) and max-latency response (8).
